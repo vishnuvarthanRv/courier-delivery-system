@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Customers — Courier & Delivery System</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <span class="brand-icon">🚚</span>
+      <div><h2>CourierDS</h2><span>Management System</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a href="/dashboard"><span class="nav-icon">📊</span> Dashboard</a>
+      <div class="nav-section">Manage</div>
+      <a href="/parcels"><span class="nav-icon">📦</span> Parcels</a>
+      <a href="/customers" class="active"><span class="nav-icon">👥</span> Customers</a>
+      <a href="/staff"><span class="nav-icon">🛵</span> Delivery Staff</a>
+      <a href="/deliveries"><span class="nav-icon">🗺️</span> Deliveries</a>
+      <div class="nav-section">Finance</div>
+      <a href="/payments"><span class="nav-icon">💳</span> Payments</a>
+      <a href="/reports"><span class="nav-icon">📈</span> Reports</a>
+      <div class="nav-section">Tools</div>
+      <a href="/track"><span class="nav-icon">🔍</span> Track Parcel</a>
+    </nav>
+  </aside>
+  <div class="sidebar-overlay"></div>
+
+  <div class="main-content">
+    <div class="topbar">
+      <div class="d-flex align-center gap-10">
+        <button class="menu-toggle">☰</button>
+        <div class="topbar-left"><h1>Customers</h1><p>Manage customer records</p></div>
+      </div>
+      <div class="topbar-right">
+        <div class="admin-badge"><div class="avatar">A</div><span id="adminName">Admin</span></div>
+        <button class="btn-logout" onclick="logout()">Logout</button>
+      </div>
+    </div>
+
+    <div class="page-content">
+      <div class="card">
+        <div class="card-header">
+          <h3>👥 Customer List</h3>
+          <div class="d-flex gap-10">
+            <div class="search-bar">
+              <input type="text" id="searchInput" class="search-input" placeholder="🔍 Search customers...">
+              <button class="btn btn-secondary" id="searchBtn">Search</button>
+            </div>
+            <button class="btn btn-primary" id="addCustomerBtn">+ Add Customer</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>#</th><th>Name</th><th>Email</th><th>Phone</th><th>City</th><th>Joined</th><th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="customersTable">
+              <tr><td colspan="7" class="text-center"><div class="loading-spinner"><div class="spinner"></div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add/Edit Modal -->
+  <div class="modal-overlay" id="customerModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3 id="modalTitle">Add Customer</h3>
+        <button class="modal-close" onclick="closeModal()">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="modalAlert"></div>
+        <form id="customerForm" novalidate>
+          <input type="hidden" id="customerId">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Full Name <span class="required">*</span></label>
+              <input type="text" id="cusName" class="form-control" placeholder="Enter name" required>
+              <div class="error-msg"></div>
+            </div>
+            <div class="form-group">
+              <label>Email <span class="required">*</span></label>
+              <input type="email" id="cusEmail" class="form-control" placeholder="Enter email" required>
+              <div class="error-msg"></div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Phone <span class="required">*</span></label>
+              <input type="text" id="cusPhone" class="form-control" placeholder="07XXXXXXXX" required>
+              <div class="error-msg"></div>
+            </div>
+            <div class="form-group">
+              <label>City</label>
+              <input type="text" id="cusCity" class="form-control" placeholder="Enter city">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Address <span class="required">*</span></label>
+            <textarea id="cusAddress" class="form-control" rows="2" placeholder="Enter full address" required></textarea>
+            <div class="error-msg"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveCustomerBtn">Save Customer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete Confirm Modal -->
+  <div class="modal-overlay" id="deleteModal">
+    <div class="modal" style="max-width:380px;">
+      <div class="modal-header"><h3>Confirm Delete</h3><button class="modal-close" onclick="closeDeleteModal()">✕</button></div>
+      <div class="modal-body">
+        <p>Are you sure you want to delete <strong id="deleteCustomerName"></strong>? This action cannot be undone.</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+        <button class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script src="/js/app.js"></script>
+  <script>
+    let deleteId = null;
+
+    function loadCustomers(search = '') {
+      $.get('/api/customers', { search }).done(res => {
+        if (!res.success) return;
+        const customers = res.data;
+        if (customers.length === 0) {
+          $('#customersTable').html('<tr><td colspan="7" class="text-center text-muted">No customers found</td></tr>');
+          return;
+        }
+        let html = '';
+        customers.forEach((c, i) => {
+          html += `<tr>
+            <td>${i + 1}</td>
+            <td><strong>${c.name}</strong></td>
+            <td>${c.email}</td>
+            <td>${c.phone}</td>
+            <td>${c.city || '-'}</td>
+            <td>${formatDate(c.created_at)}</td>
+            <td>
+              <button class="btn btn-sm btn-warning" onclick="editCustomer(${c.id})">✏️ Edit</button>
+              <button class="btn btn-sm btn-danger" onclick="confirmDelete(${c.id}, '${c.name.replace(/'/g,"\\'")}')">🗑️ Delete</button>
+            </td>
+          </tr>`;
+        });
+        $('#customersTable').html(html);
+      });
+    }
+
+    function openModal(title = 'Add Customer') {
+      $('#modalTitle').text(title);
+      $('#customerModal').addClass('active');
+    }
+
+    function closeModal() {
+      $('#customerModal').removeClass('active');
+      $('#customerForm')[0].reset();
+      $('#customerId').val('');
+      $('#modalAlert').html('');
+    }
+
+    function editCustomer(id) {
+      $.get(`/api/customers/${id}`).done(res => {
+        if (!res.success) return;
+        const c = res.data;
+        $('#customerId').val(c.id);
+        $('#cusName').val(c.name);
+        $('#cusEmail').val(c.email);
+        $('#cusPhone').val(c.phone);
+        $('#cusCity').val(c.city);
+        $('#cusAddress').val(c.address);
+        openModal('Edit Customer');
+      });
+    }
+
+    function confirmDelete(id, name) {
+      deleteId = id;
+      $('#deleteCustomerName').text(name);
+      $('#deleteModal').addClass('active');
+    }
+
+    function closeDeleteModal() {
+      $('#deleteModal').removeClass('active');
+      deleteId = null;
+    }
+
+    $('#addCustomerBtn').on('click', () => openModal('Add Customer'));
+
+    $('#saveCustomerBtn').on('click', function () {
+      if (!validateForm('customerForm')) return;
+      const id = $('#customerId').val();
+      const data = {
+        name: $('#cusName').val().trim(),
+        email: $('#cusEmail').val().trim(),
+        phone: $('#cusPhone').val().trim(),
+        city: $('#cusCity').val().trim(),
+        address: $('#cusAddress').val().trim()
+      };
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `/api/customers/${id}` : '/api/customers';
+
+      $.ajax({ url, method, contentType: 'application/json', data: JSON.stringify(data) })
+        .done(res => {
+          if (res.success) {
+            showToast(res.message, 'success');
+            closeModal();
+            loadCustomers();
+          }
+        })
+        .fail(xhr => {
+          const msg = xhr.responseJSON?.message || 'Error saving customer';
+          $('#modalAlert').html(`<div class="alert alert-danger">❌ ${msg}</div>`);
+        });
+    });
+
+    $('#confirmDeleteBtn').on('click', function () {
+      if (!deleteId) return;
+      $.ajax({ url: `/api/customers/${deleteId}`, method: 'DELETE' })
+        .done(res => {
+          if (res.success) {
+            showToast('Customer deleted successfully', 'success');
+            closeDeleteModal();
+            loadCustomers();
+          }
+        })
+        .fail(xhr => {
+          showToast(xhr.responseJSON?.message || 'Delete failed', 'error');
+          closeDeleteModal();
+        });
+    });
+
+    // Search with jQuery AJAX
+    let searchTimer;
+    $('#searchInput').on('input', function () {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => loadCustomers($(this).val()), 400);
+    });
+
+    $('#searchBtn').on('click', () => loadCustomers($('#searchInput').val()));
+
+    // Load admin name
+    $.get('/api/auth/session').done(res => {
+      if (res.success) $('#adminName').text(res.admin.username);
+    });
+
+    loadCustomers();
+  </script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login — Courier & Delivery System</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-hero">
+        <div class="logo">🚚</div>
+        <h1>CourierDS</h1>
+        <p>Courier & Delivery Management System</p>
+      </div>
+      <div class="login-form">
+        <h2>Admin Login</h2>
+        <div id="loginAlert"></div>
+        <form id="loginForm" novalidate>
+          <div class="form-group">
+            <label for="username">Username or Email <span class="required">*</span></label>
+            <input type="text" id="username" class="form-control" placeholder="Enter username" required>
+            <div class="error-msg"></div>
+          </div>
+          <div class="form-group">
+            <label for="password">Password <span class="required">*</span></label>
+            <input type="password" id="password" class="form-control" placeholder="Enter password" required>
+            <div class="error-msg"></div>
+          </div>
+          <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px;" id="loginBtn">
+            🔐 Login
+          </button>
+        </form>
+        <p class="text-muted text-center mt-10">
+          Default: <strong>admin</strong> / <strong>password</strong>
+        </p>
+        <div style="margin-top:20px; padding-top:15px; border-top:1px solid #eee; text-align:center;">
+          <a href="/track" style="color:var(--primary); font-size:13px;">📦 Track a Parcel</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script>
+    // Redirect if already logged in
+    $.get('/api/auth/session').done(() => { window.location.href = '/dashboard'; });
+
+    $('#loginForm').on('submit', function (e) {
+      e.preventDefault();
+      const username = $('#username').val().trim();
+      const password = $('#password').val();
+      if (!username || !password) {
+        $('#loginAlert').html('<div class="alert alert-danger">⚠️ Please fill in all fields.</div>');
+        return;
+      }
+      const $btn = $('#loginBtn');
+      $btn.prop('disabled', true).text('Logging in...');
+
+      $.ajax({
+        url: '/api/auth/login',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ username, password }),
+        success: function (res) {
+          if (res.success) {
+            $('#loginAlert').html('<div class="alert alert-success">✅ Login successful! Redirecting...</div>');
+            setTimeout(() => { window.location.href = '/dashboard'; }, 800);
+          }
+        },
+        error: function (xhr) {
+          const msg = xhr.responseJSON?.message || 'Login failed';
+          $('#loginAlert').html(`<div class="alert alert-danger">❌ ${msg}</div>`);
+          $btn.prop('disabled', false).text('🔐 Login');
+        }
+      });
+    });
+  </script>
+</body>
+</html>

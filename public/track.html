@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Parcel — Courier & Delivery System</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="track-page">
+    <div class="track-card">
+      <div class="track-header">
+        <div style="font-size:48px; margin-bottom:10px;">🚚</div>
+        <h1>Track Your Parcel</h1>
+        <p>Enter your tracking number to see real-time delivery status</p>
+      </div>
+
+      <div class="d-flex gap-10" style="margin-bottom:20px;">
+        <input type="text" id="trackingInput" class="form-control"
+          placeholder="e.g. CDS-1234-2024"
+          style="flex:1; padding:14px 18px; font-size:16px; border-radius:8px;">
+        <button id="trackBtn" class="btn btn-primary" style="padding:14px 24px; font-size:15px;">
+          🔍 Track
+        </button>
+      </div>
+
+      <div id="trackAlert"></div>
+
+      <!-- Result Section -->
+      <div id="trackResult" style="display:none;">
+        <!-- Parcel Summary -->
+        <div style="background:var(--light-gray); border-radius:12px; padding:20px; margin-bottom:20px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+            <div>
+              <p style="font-size:12px; color:var(--gray); text-transform:uppercase;">Tracking Number</p>
+              <p style="font-size:22px; font-weight:700; color:var(--primary);" id="resultTracking"></p>
+            </div>
+            <div id="resultStatus"></div>
+          </div>
+          <hr style="border:none; border-top:1px solid var(--border); margin:15px 0;">
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:15px;">
+            <div>
+              <p style="font-size:11px; color:var(--gray); text-transform:uppercase; margin-bottom:4px;">Sender</p>
+              <p style="font-weight:600;" id="resultSender"></p>
+            </div>
+            <div>
+              <p style="font-size:11px; color:var(--gray); text-transform:uppercase; margin-bottom:4px;">Recipient</p>
+              <p style="font-weight:600;" id="resultRecipient"></p>
+            </div>
+            <div>
+              <p style="font-size:11px; color:var(--gray); text-transform:uppercase; margin-bottom:4px;">Type</p>
+              <p style="font-weight:600;" id="resultType"></p>
+            </div>
+            <div>
+              <p style="font-size:11px; color:var(--gray); text-transform:uppercase; margin-bottom:4px;">Weight</p>
+              <p style="font-weight:600;" id="resultWeight"></p>
+            </div>
+          </div>
+          <div style="margin-top:12px;">
+            <p style="font-size:11px; color:var(--gray); text-transform:uppercase; margin-bottom:4px;">Delivery Address</p>
+            <p style="font-weight:500;" id="resultAddress"></p>
+          </div>
+        </div>
+
+        <!-- Tracking Timeline -->
+        <h4 style="font-size:15px; font-weight:600; margin-bottom:15px;">📍 Tracking History</h4>
+        <div class="tracking-timeline" id="trackingTimeline"></div>
+      </div>
+
+      <div style="text-align:center; margin-top:30px; padding-top:20px; border-top:1px solid var(--border);">
+        <a href="/" style="color:var(--gray); font-size:13px;">← Back to Login</a>
+        &nbsp;|&nbsp;
+        <a href="/dashboard" style="color:var(--primary); font-size:13px;">Admin Dashboard →</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+  <script>
+    const statusIcons = {
+      'Pending': '📋', 'Picked Up': '📤', 'In Transit': '🚚',
+      'Out for Delivery': '🛵', 'Delivered': '✅', 'Failed': '❌', 'Returned': '↩️'
+    };
+
+    const statusBadgeMap = {
+      'Pending': 'badge-pending', 'Picked Up': 'badge-assigned', 'In Transit': 'badge-transit',
+      'Out for Delivery': 'badge-transit', 'Delivered': 'badge-delivered',
+      'Failed': 'badge-failed', 'Returned': 'badge-failed'
+    };
+
+    function formatDate(str) {
+      if (!str) return '-';
+      return new Date(str).toLocaleString('en-GB', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    }
+
+    function trackParcel() {
+      const tracking = $('#trackingInput').val().trim().toUpperCase();
+      if (!tracking) {
+        $('#trackAlert').html('<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:8px;margin-bottom:10px;">⚠️ Please enter a tracking number.</div>');
+        return;
+      }
+      $('#trackAlert').html('');
+      $('#trackResult').hide();
+      $('#trackBtn').prop('disabled', true).text('Searching...');
+
+      $.get(`/api/parcels/track/${tracking}`)
+        .done(res => {
+          if (!res.success || !res.data) {
+            $('#trackAlert').html('<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:8px;">❌ Parcel not found. Please check your tracking number.</div>');
+            return;
+          }
+          const p = res.data;
+          $('#resultTracking').text(p.tracking_number);
+          $('#resultStatus').html(`<span class="badge ${statusBadgeMap[p.status] || ''}" style="font-size:14px;padding:6px 14px;">${statusIcons[p.status] || '📦'} ${p.status}</span>`);
+          $('#resultSender').text(p.sender_name);
+          $('#resultRecipient').text(p.recipient_name + ' (' + p.recipient_phone + ')');
+          $('#resultType').text(p.parcel_type);
+          $('#resultWeight').text(p.weight + ' kg');
+          $('#resultAddress').text(p.recipient_address + (p.recipient_city ? ', ' + p.recipient_city : ''));
+
+          // Build timeline
+          let timelineHtml = '';
+          const history = p.history ? (typeof p.history === 'string' ? JSON.parse(p.history) : p.history) : [];
+          if (history && history.length > 0) {
+            history.forEach((h, i) => {
+              const icon = statusIcons[h.status] || '📍';
+              const isFirst = i === 0;
+              timelineHtml += `
+                <div class="timeline-item">
+                  <div class="timeline-dot" style="${isFirst ? 'background:var(--secondary);' : 'background:var(--gray);'}">
+                    ${icon}
+                  </div>
+                  <div class="timeline-content">
+                    <h4>${h.status}</h4>
+                    ${h.location ? `<p>📍 ${h.location}</p>` : ''}
+                    ${h.notes ? `<p>${h.notes}</p>` : ''}
+                    <p class="time">🕐 ${formatDate(h.updated_at)}</p>
+                  </div>
+                </div>`;
+            });
+          } else {
+            timelineHtml = '<p style="color:var(--gray);font-size:14px;">No tracking history available.</p>';
+          }
+          $('#trackingTimeline').html(timelineHtml);
+          $('#trackResult').show();
+        })
+        .fail(() => {
+          $('#trackAlert').html('<div style="background:#f8d7da;color:#721c24;padding:12px;border-radius:8px;">❌ Parcel not found. Please check your tracking number.</div>');
+        })
+        .always(() => {
+          $('#trackBtn').prop('disabled', false).text('🔍 Track');
+        });
+    }
+
+    $('#trackBtn').on('click', trackParcel);
+
+    $('#trackingInput').on('keypress', function (e) {
+      if (e.key === 'Enter') trackParcel();
+    });
+
+    // Auto-track if URL has query param
+    const urlParams = new URLSearchParams(window.location.search);
+    const preTracking = urlParams.get('id');
+    if (preTracking) {
+      $('#trackingInput').val(preTracking);
+      trackParcel();
+    }
+
+    // jQuery animation: focus effect
+    $('#trackingInput').on('focus', function () {
+      $(this).css('box-shadow', '0 0 0 3px rgba(26,115,232,0.2)');
+    }).on('blur', function () {
+      $(this).css('box-shadow', 'none');
+    });
+  </script>
+</body>
+</html>
